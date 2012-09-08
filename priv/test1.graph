@@ -1,0 +1,13 @@
+agent A
+agent B
+agent C
+agent D
+agent E
+#
+relation A B 1
+relation A C 1
+relation A D 1
+relation B C 1
+relation C E 1
+relation D B 1
+relation E A 1

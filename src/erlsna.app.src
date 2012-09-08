@@ -1,0 +1,28 @@
+{application, erlsna,
+ [
+  {description, ""},
+  {vsn, "0.1"},
+  {modules, [
+             erlsna_app,
+             erlsna_sup,
+             agent_sup,
+             agent,
+             agent_util,
+             gatekeeper,
+             tcpserv_sup,
+             tcpserv_serv,
+             algorithms,
+             util,
+             events,
+             eventkeeper,
+             floyd_warshall,
+             pubsub1
+            ]},
+  {registered, [gatekeeper, events]},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { erlsna_app, []}},
+  {env, [{tcpserv_port, 8082}]}
+ ]}.

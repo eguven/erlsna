@@ -1,0 +1,16 @@
+args <- commandArgs(TRUE)
+d1 = read.table(args[1])
+incoming = d1$V3
+outgoing = d1$V5
+g_range <- range(0, incoming, outgoing)
+line_count = length(incoming)
+png(filename=args[2], height=800, width=800, bg="white")
+plot(outgoing, type="o", col="black", axes=FALSE, ann=FALSE, ylim=g_range)
+axis(1,las=1,at=6*0:line_count)
+axis(2,las=1,at=8*0:g_range[2])
+lines(incoming, type="o",pch=22, lty=2, col="red")
+title(main="Engagement", col.main="black", font.main=4)
+title(xlab=paste("Time",args[3]), col.lab=rgb(0,0.5,0))
+title(ylab="Messages", col.lab=rgb(0,0.5,0))
+legend(line_count-9, g_range[2], c("outgoing","incoming"), cex=0.8, col=c("black","red"), pch=21:22, lty=1:2)
+dev.off()

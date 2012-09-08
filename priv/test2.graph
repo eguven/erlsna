@@ -1,0 +1,19 @@
+agent A name Aname 1336500001
+agent B name Bname 1336500002
+agent C name Cname 1336500003
+agent D name Dname 1336500004
+agent E name Ename 1336500005
+agent F name Fname 1336500006
+#
+relation A B 1 1336500011
+relation A C 1 1336500012
+relation D A 1 1336500013
+relation A D 1 1336500014
+relation A E 1 1336500015
+relation F A 1 1336500016
+#
+adjust_relation A B 1 1336500021
+adjust_relation D A 2 1336500022
+adjust_relation A D 1 1336500023
+adjust_relation F A 2 1336500024
+adjust_relation A E 1 1336500025
