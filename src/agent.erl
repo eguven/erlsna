@@ -1,10 +1,3 @@
-%%%---------------------------------------------------------------------
-%%% Description module agent
-%%%---------------------------------------------------------------------
-%%% Agents are gen_server processes representing an agent/node in the
-%%% network.
-%%%---------------------------------------------------------------------
-
 -module(agent).
 -behaviour(gen_server).
 -include("records.hrl").
@@ -16,7 +9,12 @@
 -export([start_link/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
-% TODO: remove TS from add/remove _from functions, necessary events are synced
+%%%---------------------------------------------------------------------
+%%% Description module agent
+%%%---------------------------------------------------------------------
+%%% Agents are gen_server processes representing an agent/node in the
+%%% network.
+%%%---------------------------------------------------------------------
 
 %% Create an agent record with an Id
 make_agent(Id) -> make_agent(Id, orddict:new()).
@@ -95,10 +93,7 @@ adjust_relation(AgentPid, TargetPid, Adjustment, Timestamp) ->
 adjust_relation(AgentPid, TargetPid, Adjustment) ->
     adjust_relation(AgentPid, TargetPid, Adjustment, erlang:now()).
 
-%% add_relation_from
-add_relation_from(AgentPid, SourcePid, RelationValue, Timestamp) ->
-    gen_server:cast(AgentPid, {add_indegree, SourcePid, RelationValue, Timestamp}).
-
+%% remove_relation
 remove_relation(AgentPid, TargetPid) ->
     gen_server:cast(AgentPid, {remove_outdegree, TargetPid}).
 
@@ -164,10 +159,9 @@ handle_call({get_info, Key}, _From, Agent) ->
 handle_cast({add_outdegree, TargetPid, RelationValue, Timestamp}, Agent) ->
     Outdegrees = Agent#agent.outdegrees,
     NewOutdegrees = orddict:store(TargetPid, RelationValue, Outdegrees),
-    % create Timestamp to match add_indegree and add_outdegree
-    %Ts = erlang:now(),
-    % Ts in add_relation_from is not used, synced update in events:new_relation
-    add_relation_from(TargetPid, Agent#agent.pid, RelationValue, Timestamp),
+
+    gen_server:cast(TargetPid, {add_indegree, Agent#agent.pid, RelationValue, Timestamp}),
+
     NewAgent = Agent#agent{outdegrees=NewOutdegrees},
     %%%% UPDATE HISTORY
     %events:delayed_snapshot([Agent#agent.pid,TargetPid], 5, "New relation"),
@@ -177,17 +171,11 @@ handle_cast({add_outdegree, TargetPid, RelationValue, Timestamp}, Agent) ->
     {noreply, NewAgent};
 
 %% add_indegree, called from agent:handle_cast({add_outdegree, _, _}, _)
-%% add_relation_from
 handle_cast({add_indegree, SourcePid, RelationValue, _Timestamp}, Agent) ->
     Indegrees = Agent#agent.indegrees,
     NewIndegrees = orddict:store(SourcePid, RelationValue, Indegrees),
     NewAgent = Agent#agent{indegrees=NewIndegrees},
-    %%%% UPDATE HISTORY
-    %%% -> update moved to synced event in add_outdegree
-    %NewAgent = agent_util:update_history(NewAgentTemp, Timestamp, "Added indegree"),
-    %update_history(Agent#agent.pid, Timestamp, "Added indegree"),
     {noreply, NewAgent};
-
 
 %% remove_outdegree, called from agent:remove_relation
 handle_cast({remove_outdegree, TargetPid}, Agent) ->
@@ -198,9 +186,6 @@ handle_cast({remove_outdegree, TargetPid}, Agent) ->
     NewAgent = Agent#agent{outdegrees=NewOutdegrees},
     %%%% UPDATE HISTORY
     events:new_relation(Agent#agent.pid,TargetPid),
-    %events:delayed_snapshot([Agent#agent.pid,TargetPid], 5, "Removed relation"),
-    %NewAgent = agent_util:update_history(NewAgentTemp, Ts, "Removed outdegree"),
-    %update_history(Agent#agent.pid, Ts, "Removed outdegree"),
     {noreply, NewAgent};
 
 %% remove_indegree, called from agent:handle_cast({remove_outdegree, _}, _)
@@ -239,9 +224,8 @@ handle_cast({adjust_relation, TargetPid, Adjustment, Timestamp}, Agent) ->
             NewValue =  Val + Adjustment,
             NewOutdegrees = orddict:store(TargetPid, NewValue, Agent#agent.outdegrees),
             NewAgent = Agent#agent{outdegrees=NewOutdegrees},
-            %Ts = erlang:now(),
-            % Ts in add_relation_from is not used, synced update in events:new_relation
-            add_relation_from(TargetPid, Agent#agent.pid, NewValue, Timestamp),
+
+            gen_server:cast(TargetPid, {add_indegree, Agent#agent.pid, NewValue, Timestamp}),
             %%%% UPDATE HISTORY
             events:new_relation(Agent#agent.pid, TargetPid, Timestamp),
             {noreply, NewAgent};

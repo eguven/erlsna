@@ -176,15 +176,6 @@ class ERLSNA(object):
     def degree_centrality(self, aid, t_start=None, t_end=None, with_response=True):
         b = bytearray()
         b.extend(("algorithm degree_centrality %s " % aid).encode('utf-8'))
-#        if (t_start is not None and t_end and
-#                isinstance(t_start,int) and isinstance(t_end,int)):
-
-#            s = "%d %d" % (t_start, t_end)
-#            b.extend(s.encode('utf-8'))
-
-#        elif t_start and t_end:
-#            s = "%s %s" % (t_start, t_end)
-#            b.extend(s.encode('utf-8'))
         b.extend(self._parse_interval(t_start, t_end))
         return self._send_or_return(b, with_response)
 
@@ -198,11 +189,6 @@ class ERLSNA(object):
         b.extend((" %d" % timestep).encode('utf-8'))
         retval = self._send_or_return(b, with_response)
 
-#        if (with_response and with_graph_png is not None and
-#            isinstance(with_graph_png,str)):
-#            if not (with_graph_png.endswith(".png") or
-#                    with_graph_png.endswith(".PNG")):
-#                raise Exception() ## fill
         if with_response and self._is_graphfile_valid(with_graph_png):
             note = "(in %f days)" % (timestep/(3600*24))
             ResultParser.engagement_analysis(retval, aid, with_graph_png,

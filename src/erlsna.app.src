@@ -21,7 +21,9 @@
   {registered, [gatekeeper, events]},
   {applications, [
                   kernel,
-                  stdlib
+                  stdlib,
+                  sasl,
+                  crypto
                  ]},
   {mod, { erlsna_app, []}},
   {env, [{tcpserv_port, 8082}]}
