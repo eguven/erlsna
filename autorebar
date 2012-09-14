@@ -3,6 +3,7 @@
 # Just a script to clean, compile and generate release using rebar
 
 rebar clean
+sleep 0.5
 rebar compile
 rebar generate
 chmod +x rel/mynode/bin/mynode

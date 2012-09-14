@@ -56,7 +56,7 @@ get_relations(AgentPid) ->
 
 %% get arbitrary info from agent data with orddict key
 %% Args: PID of agent process
-%%       key of data (atom)
+%%       key of data (arbitrary atom or id (for id of agent) or all (complete info))
 %% Returns: Value
 agent_info(AgentPid, Key) ->
     gen_server:call(AgentPid, {get_info, Key}).
@@ -93,67 +93,83 @@ adjust_relation(AgentPid, TargetPid, Adjustment, Timestamp) ->
 adjust_relation(AgentPid, TargetPid, Adjustment) ->
     adjust_relation(AgentPid, TargetPid, Adjustment, erlang:now()).
 
-%% remove_relation
+%% remove_relation between two agents
+%% Args: PID of source agent process
+%%       PID of target agent process
 remove_relation(AgentPid, TargetPid) ->
     gen_server:cast(AgentPid, {remove_outdegree, TargetPid}).
 
-%% remove_relation_from
-remove_relation_from(AgentPid, SourcePid, Timestamp) ->
-    gen_server:cast(AgentPid, {remove_indegree, SourcePid, Timestamp}).
-
-%% update data
+%% update a single entry in agent's data
+%% Args: PID of agent process
+%%       key in data orddict
+%%       value for key
 update_data(AgentPid, Key, Value) ->
     gen_server:cast(AgentPid, {update_data, Key, Value}).
 
-%% update data k,v pairs
+%% update multiple entries in agent's data (key,value pairs)
+%% Args: PID of agent process
+%%       list of {key,value}
 update_data(AgentPid, [H|T]) ->
     lists:map(fun({K,V}) -> update_data(AgentPid, K, V) end, [H|T]).
 
-%% update_history
-update_history(AgentPid, Note) ->
-    gen_server:cast(AgentPid, {update_history, Note}).
-
-%% update_history with timestamp
+%% update_history, creating a snapshot of current agent state and storing it in agent's history
+%% see agent_util:update_history/3 for more details
+%% Args: PID of agent process
+%%       timestamp()
+%%       a note about update
 update_history(AgentPid, Timestamp, Note) ->
     gen_server:cast(AgentPid, {update_history, Timestamp, Note}).
 
-% Agent Process
-%init([Agent|_]) ->
-%    NewAgent = Agent#agent{pid=self()},
-%    register_agent(NewAgent),
-%    {ok, NewAgent}.
+%% same as update_history/3 without timestamp
+update_history(AgentPid, Note) ->
+    gen_server:cast(AgentPid, {update_history, Note}).
+
+%%%---------------------------------------------------------------------
+%%% Agent Process
+%%%---------------------------------------------------------------------
+
+%% init agent process
+%% Args: agent (see agent:make_agent)
 init(Agent) ->
-    %Ts = erlang:now(),
     NewAgentTemp = Agent#agent{pid=self()},
     NewAgent = agent_util:update_history(NewAgentTemp,Agent#agent.created,"Created"),
+    % register to gatekeeper
     register_agent(NewAgent),
     {ok, NewAgent}.
 
 start_link(Agent) ->
     gen_server:start_link(?MODULE, Agent, []).
 
-% handle_call
+%%%---------------------------------------------------------------------
+%%% Handling Synchoronous Calls
+%%%---------------------------------------------------------------------
+
 handle_call(terminate, _From, Agent) ->
     {stop, normal, ok, Agent};
 
+%% called from agent:get_relations
 handle_call(relations, _From, Agent) ->
     Reply = {Agent#agent.indegrees, Agent#agent.outdegrees},
     {reply, Reply, Agent};
 
+%% called from agent:agent_info/2, handling id request (id info of agent)
 handle_call({get_info, id}, _From, Agent) ->
     {reply, Agent#agent.id, Agent};
 
+%% called from agent:agent_info/2, handling all request (complete agent)
 handle_call({get_info, all}, _From, Agent) ->
     {reply, Agent, Agent};
 
-% TODO: change to tagged return
+%% called from agent_agent_info/2, handling arbitrary info requests
 handle_call({get_info, Key}, _From, Agent) ->
     case orddict:find(Key, Agent#agent.data) of
-        {ok, Value} -> {reply, Value, Agent};
+        {ok, Value} -> {reply, {ok, Value}, Agent};
         error -> {reply, {error, not_found}, Agent}
     end.
 
-%%% handle_cast
+%%%---------------------------------------------------------------------
+%%% Handling Asynchoronous Calls
+%%%---------------------------------------------------------------------
 
 %% add_outdegree, called from agent:add_relation
 handle_cast({add_outdegree, TargetPid, RelationValue, Timestamp}, Agent) ->
@@ -178,25 +194,25 @@ handle_cast({add_indegree, SourcePid, RelationValue, _Timestamp}, Agent) ->
     {noreply, NewAgent};
 
 %% remove_outdegree, called from agent:remove_relation
+%remove_relation_from(AgentPid, SourcePid, Timestamp) ->
+%    gen_server:cast(AgentPid, {remove_indegree, SourcePid, Timestamp}).
 handle_cast({remove_outdegree, TargetPid}, Agent) ->
+    % new outdegrees with removed outdegree from self to target
     NewOutdegrees = orddict:erase(TargetPid, Agent#agent.outdegrees),
-    % create Timestamp to match remove_indegree and remove_outdegree
-    Ts = erlang:now(),
-    remove_relation_from(TargetPid, Agent#agent.pid, Ts),
+    % remove the indegree from target
+    gen_server:cast(TargetPid, {remove_indegree, Agent#agent.pid}),
+    % update outdegrees
     NewAgent = Agent#agent{outdegrees=NewOutdegrees},
     %%%% UPDATE HISTORY
     events:new_relation(Agent#agent.pid,TargetPid),
     {noreply, NewAgent};
 
 %% remove_indegree, called from agent:handle_cast({remove_outdegree, _}, _)
-%% remove_relation_from
-handle_cast({remove_indegree, SourcePid, _Timestamp}, Agent) ->
+handle_cast({remove_indegree, SourcePid}, Agent) ->
+    % new indegrees with removed indegree to self from source
     NewIndegrees = orddict:erase(SourcePid, Agent#agent.indegrees),
+    % update indegrees
     NewAgent = Agent#agent{indegrees=NewIndegrees},
-    %%%% UPDATE HISTORY
-    %%% -> update moved to synced event in remove_outdegree
-    %NewAgent = agent_util:update_history(NewAgentTemp, Timestamp, "Removed indegree"),
-    %update_history(Agent#agent.pid, Timestamp, "Removed indegree"),
     {noreply, NewAgent};
 
 %% update some key in data

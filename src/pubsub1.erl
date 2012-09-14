@@ -52,7 +52,7 @@ check_agent(AgentPid, Predicate) ->
       agent:update_data(AgentPid,closeness_centrality,Val),
       agent:update_history(AgentPid,"ClosenessCentrality"),
       {false,Val};
-    Value ->
+    {ok,Value} ->
       % call predicate with current,previous
       RetVal = Predicate(Val,Value),
       agent:update_data(AgentPid,closeness_centrality,Val),

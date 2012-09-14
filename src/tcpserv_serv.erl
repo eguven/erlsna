@@ -91,7 +91,7 @@ parse_tokens([algorithm, AlgoName | Args]) ->
     catch
         Type:Exception ->
             io:format("Algorithm Error: ~p(~p)~n", [Algorithm, Args]),
-            io:format("~p:~p~n", [Type, Exception]),
+            io:format("Error Type: ~p: ~p~n", [Type, Exception]),
             {Algorithm, error}
     end;
 

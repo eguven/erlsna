@@ -39,9 +39,9 @@ For information on analyses and example graphs, see the paper, Chapter 5.
 Used to collect data from NNTP servers for testing and demonstration, requires
 [MongoDB](http://www.mongodb.org/) to be running.
 
-*collect:* collect (from where it left off) new articles from given server & group
-*emailfixer:* to fix dual-line "From:" header issue in NNTP responses, will prompt user for fixes
-*livedump:* psuh data to running erlsna node
+**collect:** collect (from where it left off) new articles from given server & group
+**emailfixer:** to fix dual-line "From:" header issue in NNTP responses, will prompt user for fixes
+**livedump:** push data to running erlsna node
 
 ### erlsna Python3 driver ###
 
@@ -51,4 +51,4 @@ Used to collect data from NNTP servers for testing and demonstration, requires
     png_path = os.path.expanduser("~/engagement_graph.png")
     api.engagement_analysis("foo@bar.com", with_graph_png=png_path)
 
-For available keywords and further driver uses, refer to the *erlsna.py* source code.
+For available keywords and further driver uses, refer to the **erlsna.py** source code.

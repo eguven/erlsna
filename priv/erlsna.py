@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Python3 TCP for erlsna"""
+"""Python3 driver for erlsna"""
 
 import socket
 import sys
@@ -23,6 +23,7 @@ def new_sock(host=HOST,port=PORT):
     return sock
 
 def do_import(path):
+    """Import file to live erlsna system"""
     try:
         f = open(path, "r")
     except IOError:
@@ -41,43 +42,6 @@ def do_import(path):
     f.close()
     sock.close()
     print("Import Complete")
-    return
-
-alphabet = ["P","R","S","T","U","V","W","X","Y","Z"]
-agents = []
-
-def random_name(): return "".join(random.sample(alphabet, 5))
-
-def push(n,pn=1.3):
-    sock = new_sock()
-    sock.send("agent PRSTU\r\n".encode())
-    sock.recv(1024)
-    agents.append("PRSTU")
-    for a in range(0,n):
-        name = random_name()
-        sock.send(("agent %s\r\n" % name).encode())
-        sock.recv(1024)
-        agents.append(name)
-    for r in range(0,math.floor(math.pow(n,pn))):
-        l = random.sample(agents, 2)
-        msg = "relation %s %s 1\r\n"%tuple(l)
-        sock.send(msg.encode())
-        sock.recv(1024*8)
-    print("DONE")
-    sock.close()
-    return
-
-def clean():
-    sock = new_sock()
-    global agents
-    for aid in agents:
-        msg = "delete_agent %s \r\n" % aid
-        sock.send(msg.encode())
-        sock.recv(1024)
-    print("DONE")
-    sock.close()
-    agents = []
-    return
 
 class ERLSNA(object):
     """An object providing API to erlsna system"""
@@ -270,12 +234,28 @@ class ResultParser(object):
         else:
             print("Failed, permission to create PNG?")
 
+# some stuff to help during development
+alphabet = ["P","R","S","T","U","V","W","X","Y","Z"]
+agents = []
 
+def random_name(): return "".join(random.sample(alphabet, 5))
 
-
-
-
-
-
-
+def push(n,pn=1.3):
+    """Push random data to erlsna"""
+    sock = new_sock()
+    sock.send("agent PRSTU\r\n".encode())
+    sock.recv(1024)
+    agents.append("PRSTU")
+    for a in range(0,n):
+        name = random_name()
+        sock.send(("agent %s\r\n" % name).encode())
+        sock.recv(1024)
+        agents.append(name)
+    for r in range(0,math.floor(math.pow(n,pn))):
+        l = random.sample(agents, 2)
+        msg = "relation %s %s 1\r\n"%tuple(l)
+        sock.send(msg.encode())
+        sock.recv(1024*8)
+    print("DONE")
+    sock.close()
 
