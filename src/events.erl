@@ -21,13 +21,8 @@ new_relation(PidA, PidB, Timestamp) ->
 delayed_snapshot(AgentPid, MsDelay, Note) ->
     gen_event:notify(whereis(events), {delayed_snapshot, AgentPid, MsDelay, Note}).
 
-% Dynamic / PubSub add, preliminary
-
-%ets:new(updates_ets, [set, public, named_table]),
-%ets:insert(updates_ets, {running, false}),
-
 % {AgentPid,Predicate,SubscriberPid}
 
 pubsub_add(AgentPid,Predicate,SubscriberPid) ->
   gen_event:notify(whereis(events), {add_agent,AgentPid,Predicate,SubscriberPid}).
-%  gen_event:add_handler(whereis(events), pubsub1, [AgentPid,Predicate,SubscriberPid]).
+

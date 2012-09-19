@@ -47,7 +47,7 @@ class ERLSNA(object):
     """An object providing API to erlsna system"""
     newline = "\r\n".encode('utf-8')
 
-    def __init__(self,live=False):
+    def __init__(self,live=True):
         if live:
             self.sock = new_sock()
         else:
