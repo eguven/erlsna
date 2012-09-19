@@ -81,7 +81,7 @@ add_relation(AgentPid, TargetPid, RelationValue) ->
 add_relation(AgentPid, TargetPid) ->
     add_relation(AgentPid, TargetPid, 1).
 
-%% adjust the value of a relation
+%% adjust the value of a relation, create one if it doesn't exist
 %% Args: PID of source agent process
 %%       PID of target agent process
 %%       Numerical change (+/-)
@@ -122,7 +122,7 @@ update_history(AgentPid, Timestamp, Note) ->
 
 %% same as update_history/3 without timestamp
 update_history(AgentPid, Note) ->
-    gen_server:cast(AgentPid, {update_history, Note}).
+    update_history(AgentPid, erlang:now(), Note).
 
 %%%---------------------------------------------------------------------
 %%% Agent Process
@@ -180,10 +180,7 @@ handle_cast({add_outdegree, TargetPid, RelationValue, Timestamp}, Agent) ->
 
     NewAgent = Agent#agent{outdegrees=NewOutdegrees},
     %%%% UPDATE HISTORY
-    %events:delayed_snapshot([Agent#agent.pid,TargetPid], 5, "New relation"),
     events:new_relation(Agent#agent.pid,TargetPid, Timestamp),
-    %NewAgent = agent_util:update_history(NewAgentTemp, Ts, "Added outdegree"),
-    %update_history(Agent#agent.pid, Ts, "Added outdegree"),
     {noreply, NewAgent};
 
 %% add_indegree, called from agent:handle_cast({add_outdegree, _, _}, _)
@@ -222,10 +219,10 @@ handle_cast({update_data, Key, Value}, Agent) ->
     {noreply, NewAgent};
 
 %% update history
-handle_cast({update_history, Note}, Agent) ->
-    Ts = erlang:now(),
-    NewAgent = agent_util:update_history(Agent, Ts, Note),
-    {noreply, NewAgent};
+%handle_cast({update_history, Note}, Agent) ->
+%    Ts = erlang:now(),
+%    NewAgent = agent_util:update_history(Agent, Ts, Note),
+%    {noreply, NewAgent};
 
 %% update history with timestamp
 handle_cast({update_history, Timestamp, Note}, Agent) ->
@@ -256,39 +253,40 @@ handle_cast({adjust_relation, TargetPid, Adjustment, Timestamp}, Agent) ->
     end;
 
 
-%% forget_agent
+%% forget_agent, called from pre_terminate, signaling this agent process
+%% to forget the target agent process denoted with TargetPid
 handle_cast({forget_agent, TargetPid}, Agent) ->
     NewOutdegrees = orddict:erase(TargetPid, Agent#agent.outdegrees),
     NewIndegrees = orddict:erase(TargetPid, Agent#agent.indegrees),
     NewAgent = Agent#agent{indegrees=NewIndegrees, outdegrees=NewOutdegrees},
-    %Ts = erlang:now(),
     %%%% UPDATE HISTORY
     events:delayed_snapshot(Agent#agent.pid, 5, "Forgotten agent"),
-    %NewAgent = agent_util:update_history(NewAgentTemp, Ts, "Forgotten agent"),
     {noreply, NewAgent}.
 
-%% pre_terminate, called from terminate to cleanup relations
+%% pre_terminate, called from terminate to cleanup relations to signal all
+%% indegree/outdegree agent processes to forget this agent process
+%% folding over a unique-ified list of indegreed + outdegrees
 pre_terminate(Agent) ->
     IndegreePids = lists:map(fun({K,_V}) -> K end, Agent#agent.indegrees),
     OutdegreePids = lists:map(fun({K,_V}) -> K end, Agent#agent.outdegrees),
     Recipients = lists:usort(lists:append(IndegreePids, OutdegreePids)),
-    io:format("Sending forget_agent to Recipients ~p~n", [Recipients]),
+    io:format("Sending {forget_agent, ~p} to Recipients ~p~n", [Agent#agent.pid,Recipients]),
     [gen_server:cast(P, {forget_agent, Agent#agent.pid}) ||
         P <- Recipients],
     ok.
 
-% terminate
+% terminate, things to be done before the agent process terminates
 terminate(normal, Agent = #agent{}) ->
-    % robustness check
+    % sanity check
     io:format("Self: ~p~n", [self()]),
     io:format("Terminating ~p with PID ~p~n",[Agent#agent.id,Agent#agent.pid]),
-    %if self() /= Agent#agent.pid -> erlang:error(agent_pid_mismatch) end,
     case self() =:= Agent#agent.pid of
         false -> erlang:error(agent_pid_mismatch);
-        true -> io:format("Terminated: ~p with PID ~p~n",[Agent#agent.id,Agent#agent.pid])
+        true -> io:format("Entering cleanup: ~p with PID ~p~n",[Agent#agent.id,Agent#agent.pid])
     end,
     % tell indegrees and outdegrees to remove self
     pre_terminate(Agent),
+    % tell gatekeeper process to remove self
     unregister_agent(Agent).
 
 % extra callbacks
@@ -297,7 +295,5 @@ handle_info(Msg, Agent) ->
     {noreply, Agent}.
 
 code_change(_OldVsn, State, _Extra) ->
-    %% No change planned. The function is there for the behaviour,
-    %% but will not be used. Only a version on the next
     {ok, State}.
 
