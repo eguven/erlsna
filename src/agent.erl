@@ -39,9 +39,22 @@ create_agent(Agent) ->
 delete_agent(AgentPid) ->
     gen_server:call(AgentPid, terminate).
 
+
 % - UPDATE: this is not allowed < R14B03
 %delete_agent(AgentPid) ->
 %    agent_sup:stop_agent(AgentPid).
+
+%% pre_terminate, called from terminate to cleanup relations to signal all
+%% indegree/outdegree agent processes to forget this agent process
+%% folding over a unique-ified list of indegreed + outdegrees
+pre_terminate(Agent) ->
+    IndegreePids = lists:map(fun({K,_V}) -> K end, Agent#agent.indegrees),
+    OutdegreePids = lists:map(fun({K,_V}) -> K end, Agent#agent.outdegrees),
+    Recipients = lists:usort(lists:append(IndegreePids, OutdegreePids)),
+    io:format("Sending {forget_agent, ~p} to Recipients ~p~n", [Agent#agent.pid,Recipients]),
+    [gen_server:cast(P, {forget_agent, Agent#agent.pid}) ||
+        P <- Recipients],
+    ok.
 
 %%%---------------------------------------------------------------------
 %%% Synchronous calls to agent
@@ -139,6 +152,28 @@ init(Agent) ->
 
 start_link(Agent) ->
     gen_server:start_link(?MODULE, Agent, []).
+
+% terminate, things to be done before the agent process terminates
+terminate(normal, Agent = #agent{}) ->
+    % sanity check
+    io:format("Self: ~p~n", [self()]),
+    io:format("Terminating ~p with PID ~p~n",[Agent#agent.id,Agent#agent.pid]),
+    case self() =:= Agent#agent.pid of
+        false -> erlang:error(agent_pid_mismatch);
+        true -> io:format("Entering cleanup: ~p with PID ~p~n",[Agent#agent.id,Agent#agent.pid])
+    end,
+    % tell indegrees and outdegrees to remove self
+    pre_terminate(Agent),
+    % tell gatekeeper process to remove self
+    unregister_agent(Agent).
+
+% extra callbacks
+handle_info(Msg, Agent) ->
+    io:format("Unexpected message: ~p~n",[Msg]),
+    {noreply, Agent}.
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
 
 %%%---------------------------------------------------------------------
 %%% Handling Synchoronous Calls
@@ -252,7 +287,6 @@ handle_cast({adjust_relation, TargetPid, Adjustment, Timestamp}, Agent) ->
             {noreply, Agent}
     end;
 
-
 %% forget_agent, called from pre_terminate, signaling this agent process
 %% to forget the target agent process denoted with TargetPid
 handle_cast({forget_agent, TargetPid}, Agent) ->
@@ -262,38 +296,4 @@ handle_cast({forget_agent, TargetPid}, Agent) ->
     %%%% UPDATE HISTORY
     events:delayed_snapshot(Agent#agent.pid, 5, "Forgotten agent"),
     {noreply, NewAgent}.
-
-%% pre_terminate, called from terminate to cleanup relations to signal all
-%% indegree/outdegree agent processes to forget this agent process
-%% folding over a unique-ified list of indegreed + outdegrees
-pre_terminate(Agent) ->
-    IndegreePids = lists:map(fun({K,_V}) -> K end, Agent#agent.indegrees),
-    OutdegreePids = lists:map(fun({K,_V}) -> K end, Agent#agent.outdegrees),
-    Recipients = lists:usort(lists:append(IndegreePids, OutdegreePids)),
-    io:format("Sending {forget_agent, ~p} to Recipients ~p~n", [Agent#agent.pid,Recipients]),
-    [gen_server:cast(P, {forget_agent, Agent#agent.pid}) ||
-        P <- Recipients],
-    ok.
-
-% terminate, things to be done before the agent process terminates
-terminate(normal, Agent = #agent{}) ->
-    % sanity check
-    io:format("Self: ~p~n", [self()]),
-    io:format("Terminating ~p with PID ~p~n",[Agent#agent.id,Agent#agent.pid]),
-    case self() =:= Agent#agent.pid of
-        false -> erlang:error(agent_pid_mismatch);
-        true -> io:format("Entering cleanup: ~p with PID ~p~n",[Agent#agent.id,Agent#agent.pid])
-    end,
-    % tell indegrees and outdegrees to remove self
-    pre_terminate(Agent),
-    % tell gatekeeper process to remove self
-    unregister_agent(Agent).
-
-% extra callbacks
-handle_info(Msg, Agent) ->
-    io:format("Unexpected message: ~p~n",[Msg]),
-    {noreply, Agent}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
